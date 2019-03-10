@@ -5,9 +5,22 @@ from scipy.fftpack import dct, idct
 from scipy.ndimage import sobel
 
 def cosine_similarity(a,b):
+    '''
+    Косинусовая мера близости. Для тестов.
+    '''
     return np.dot(a.reshape(-1), b.reshape(-1))/(np.linalg.norm(a)*np.linalg.norm(b))
 
+def distance(a,b,mode='euc'):
+    if mode=='euc':
+        return np.linalg.norm(a - b)
+    elif mode=='abs':
+        return np.mean(np.abs(a.reshape(-1) - b.reshape(-1)))
+
 class ScaleClassifier:
+    '''
+    Классификатор, сравнивающий уменьшенные изображения.
+    Усредняет расстояния, полученные для разных scale-ов.
+    '''
     def __init__(self, scales=[2,3,4]):
         self.scales = scales
 
@@ -15,8 +28,8 @@ class ScaleClassifier:
         dist = 0
         
         for s in self.scales:
-            img1_rescaled = rescale(img1, 1/s, mode='reflect', anti_aliasing=True, multichannel=False)
-            img2_rescaled = rescale(img2, 1/s, mode='reflect', anti_aliasing=True, multichannel=False)
+            img1_rescaled = rescale(img1, 1/s, mode='constant', anti_aliasing=False, multichannel=False)
+            img2_rescaled = rescale(img2, 1/s, mode='constant', anti_aliasing=False, multichannel=False)
             
             dist += np.linalg.norm(img1_rescaled - img2_rescaled)
         
@@ -25,6 +38,10 @@ class ScaleClassifier:
 
 
 class RandomPointsClassifier:
+    '''
+    Классификатор, который выбирает n_points рандомных точек и смотрит, 
+    на сколько изображения отличаются в этих точках. 
+    '''
     def __init__(self, n_points=100, img_size=(112, 92), random_state=0):
         random.seed(random_state)
         
@@ -41,6 +58,10 @@ class RandomPointsClassifier:
 
 
 class DCTClassifier:
+    '''
+    Классификатор, сравнивающий результаты применения DCT к изображениям.
+    Использует не всю полученную матрицу, а только левый верхний квадрат размера size.
+    '''
     def __init__(self, size=10):
         self.size = size
         
@@ -53,8 +74,13 @@ class DCTClassifier:
     
 
 class DFTClassifier:
-    def __init__(self, clipped=True):
+    '''
+    Классификатор, сравнивающий результаты применения DFT к изображениям.
+    Если clipped=True, используется только левыя верхняя четверть спектрограммы.
+    '''
+    def __init__(self, clipped=True, size=None):
         self.clipped = clipped
+        self.size = size
         
     def Distance(self, img1, img2):
         img1_dft = np.fft.fft2(img1)
@@ -69,11 +95,18 @@ class DFTClassifier:
             h,w = img2_dft.shape
             img1_dft = img1_dft[:h//2, :w//2]
             img2_dft = img2_dft[:h//2, :w//2]
+            
+            if self.size is not None:
+                    img1_dft = img1_dft[-self.size:, -self.size:]
+                    img2_dft = img2_dft[-self.size:, -self.size:]
         
         return np.linalg.norm(img1_dft - img2_dft)
 
 
 class HistogramClassifier:
+    '''
+    Классификатор, сравнивающий гистограммы изображений.
+    '''
     def __init__(self, size=10):
         self.size = size
         
@@ -84,7 +117,11 @@ class HistogramClassifier:
 
 
 class GradientClassifier:
+    '''
+    Классификатор, сравнивающий графики градиента яркости в вертикальном направлении.
+    Я хз, правильно ли я это считаю, но нам особо и не объясняли.
+    '''
     def Distance(self, img1, img2):
-        img1_grad = sobel(img1/255, axis=0).mean(axis=1)
-        img2_grad = sobel(img2/255, axis=0).mean(axis=1)
-        return np.linalg.norm(img1_grad - img2_grad)
+        img1_grad = sobel(img1/255, axis=0).mean(axis=0)
+        img2_grad = sobel(img2/255, axis=0).mean(axis=0)
+        return np.linalg.norm(img1_grad - img2_grad, ord=1)   # L1-норма работает лучше
