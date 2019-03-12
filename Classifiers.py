@@ -1,8 +1,8 @@
 import numpy as np
 import random
+import cv2
 from skimage.transform import rescale
 from scipy.fftpack import dct, idct
-from scipy.ndimage import sobel
 
 def cosine_similarity(a,b):
     '''
@@ -111,8 +111,8 @@ class HistogramClassifier:
         self.size = size
         
     def Distance(self, img1, img2):
-        img1_hist, bin_edges = np.histogram(img1, bins=self.size)
-        img2_hist, bin_edges = np.histogram(img2, bins=self.size)
+        img1_hist = cv2.calcHist([img1],[0],None,[self.size],[0,256])
+        img2_hist = cv2.calcHist([img2],[0],None,[self.size],[0,256])
         return np.linalg.norm(img1_hist - img2_hist)
 
 
@@ -120,8 +120,16 @@ class GradientClassifier:
     '''
     Классификатор, сравнивающий графики градиента яркости в вертикальном направлении.
     Я хз, правильно ли я это считаю, но нам особо и не объясняли.
+    
+    ksize - размер окна оператора Собеля, по идее больше - лучше, но в OpenCV ограничен 
+    значением 31.
+    ord - магическая переменная, которую можно подкрутить так, чтобы точность была побольше.
     '''
+    def __init__(self, ksize=5, ord=0.05):
+        self.ksize = ksize
+        self.ord = ord
+    
     def Distance(self, img1, img2):
-        img1_grad = sobel(img1/255, axis=0).mean(axis=0)
-        img2_grad = sobel(img2/255, axis=0).mean(axis=0)
-        return np.linalg.norm(img1_grad - img2_grad, ord=1)   # L1-норма работает лучше
+        img1_grad = cv2.Sobel(img1,cv2.CV_64F,0,1,ksize=self.ksize).mean(axis=0)
+        img2_grad = cv2.Sobel(img2,cv2.CV_64F,0,1,ksize=self.ksize).mean(axis=0)
+        return np.linalg.norm(img1_grad - img2_grad, ord=self.ord)
